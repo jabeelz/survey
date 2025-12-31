@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>都市計畫樁位精度檢核系統</title>
+    <style>
+        /* --- 網頁介面樣式 --- */
+        body { font-size: 16px; background: #f4f6f9; font-family: "Microsoft JhengHei", sans-serif; padding: 10px; margin: 0; }
+        .container { max-width: 1200px; margin: auto; }
+        .card { border-radius: 12px; background: white; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        .btn { border: none; border-radius: 6px; padding: 12px; font-weight: bold; width: 100%; cursor: pointer; margin-bottom: 8px; font-size: 15px; }
+        .btn-primary { background: #0d6efd; color: white; }
+        .btn-outline { border: 1px solid #0d6efd; color: #0d6efd; background: transparent; }
+        .btn-dark { background: #212529; color: white; }
+        .btn-success { background: #198754; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; text-align: center; font-size: 16px; }
+        .project-input { background-color: #fffde7; border: 1px solid #fbc02d; font-weight: bold; color: #333; }
+        
+        .web-table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; }
+        .web-table th { background: #212529; color: white; padding: 12px; font-size: 14px; text-align: center; }
+        .web-table td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: middle; text-align: center; font-size: 14px; }
+        .text-danger { color: #dc3545 !important; font-weight: bold !important; }
+
+        /* --- 說明視窗樣式 --- */
+        #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; }
+        #helpModal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                     width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto; background: white; z-index: 1000; border-radius: 12px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .help-section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        .help-title { color: #0d6efd; font-weight: bold; font-size: 1.1rem; margin-bottom: 8px; }
+        .help-content { font-size: 14px; line-height: 1.6; color: #444; }
+        code { background: #f1f1f1; padding: 2px 5px; border-radius: 4px; color: #d63384; font-family: monospace; }
+
+        #print-area { display: none; }
+
+        /* --- 專業列印格式 --- */
+        @media print {
+            @page { size: A4 landscape; margin: 1cm; }
+            .no-print { display: none !important; }
+            #print-area { display: block !important; width: 100% !important; }
+            body { background: white !important; color: black !important; padding: 0; }
+            
+            .print-header { position: relative; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid #333; }
+            .print-title { font-size: 26pt; font-weight: bold; margin: 0; text-align: center; }
+            .print-project { font-size: 16pt; margin: 5px 0; font-weight: bold; text-align: center; }
+            .print-precision-tag { position: absolute; bottom: 5px; right: 0; font-size: 10pt; font-weight: normal; }
+            
+            .print-table { width: 100% !important; border-collapse: collapse !important; border: 2px solid black !important; table-layout: fixed !important; }
+            .print-table th { background-color: #212529 !important; color: white !important; border: 1px solid black !important; padding: 10px 2px !important; font-size: 10pt; text-align: center !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-table td { border: 1px solid black !important; color: black !important; font-size: 10pt !important; padding: 6px 2px !important; text-align: center !important; vertical-align: middle !important; height: 45px; }
+            .text-danger { color: red !important; font-weight: bold !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            .col-1 { width: 14%; } .col-2 { width: 11%; } .col-3 { width: 11%; } .col-4 { width: 8%; } 
+            .col-5 { width: 11%; } .col-6 { width: 11%; } .col-7 { width: 8%; } .col-8 { width: 8%; } 
+            .col-9 { width: 7%; } .col-10 { width: 11%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container no-print">
+    <h3 style="text-align: center; color: #333; margin-bottom: 15px;">都市計畫樁位精度檢核系統</h3>
+    
+    <div class="card">
+        <h6 style="color:#f57c00; margin:0 0 10px 0;">案名</h6>
+        <input type="text" id="projectName" class="project-input" placeholder="請輸入案名" oninput="updatePrintInfo()">
+        
+        <h6 style="color:#0d6efd; margin:10px 0 5px 0;">距離檢核標準選擇</h6>
+        <select id="precisionLevel" onchange="updatePrintInfo()">
+            <option value="2000">1/2000 (原有都市計畫樁位)</option>
+            <option value="5000">1/5000 (新訂都市計畫)</option>
+        </select>
+    </div>
+
+    <button class="btn btn-outline" onclick="openModal()">❓ 詳細操作手冊與精度標準</button>
+    
+    <div class="card">
+        <h6 style="color:#0d6efd; margin:0 0 10px 0;">1. 匯入公告座標 (CSV)</h6>
+        <input type="file" id="csvFile" accept=".csv">
+        <button class="btn btn-dark" onclick="readCSV()">讀取並儲存點位</button>
+        <div id="fileStatus" style="font-size: 12px; text-align: center; color: #666; margin-top: 5px;">尚未載入座標資料</div>
+    </div>
+
+    <div class="card">
+        <h6 style="color:#0d6efd; margin:0 0 10px 0;">2. 檢測數據輸入</h6>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="pt0" placeholder="站點">
+            <input type="text" id="ptb" placeholder="後視">
+            <input type="text" id="ptf" placeholder="前視">
+        </div>
+        <input type="number" id="angle" placeholder="實測角度 (格式: 度.分秒)" step="0.0001" oninput="checkAngle(this)">
+        <div id="angleWarn" style="color:red; font-size:12px; display:none; text-align:center; margin-bottom:10px;">⚠️ 角度範圍須為 0 ~ 360</div>
+        <input type="number" id="dist" placeholder="實測平距 (m)" step="0.001">
+        <button id="calcBtn" class="btn btn-primary" onclick="calculate()">執行檢核計算</button>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-success" onclick="window.print()">🖨️ 列印專業報表</button>
+            <button class="btn btn-danger" onclick="clearAll()">🗑️ 全部清空</button>
+        </div>
+    </div>
+
+    <div class="card" style="overflow-x: auto;">
+        <h4 style="text-align: center; margin: 0 0 15px 0;">檢核紀錄預覽</h4>
+        <table class="web-table">
+            <thead>
+                <tr>
+                    <th style="width:25%">站/後/前</th>
+                    <th>角度 (量/計/差)</th>
+                    <th>距離 (量/計/差)</th>
+                    <th>結果</th>
+                    <th class="no-print">操作</th>
+                </tr>
+            </thead>
+            <tbody id="web-tbody">
+                <tr><td colspan="5" style="padding:40px; color:#999;">目前尚無紀錄</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modalOverlay" onclick="closeModal()"></div>
+<div id="helpModal">
+    <h3 style="margin-top:0; color:#0d6efd; text-align:center; margin-bottom:20px;">📖 系統詳細操作手冊</h3>
+    
+    <div class="help-section">
+        <div class="help-title">一、 CSV 檔案範例格式</div>
+        <div class="help-content">
+            請準備不含標題列之座標檔，格式為：<code>點號, E座標, N座標</code>。<br>
+            <div style="background:#f8f9fa; padding:10px; border:1px solid #ddd; margin:10px 0; font-family:monospace;">
+                K01, 185123.456, 2504567.890<br>
+                K02, 185200.111, 2504600.222
+            </div>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <div class="help-title">二、 合格精度判定標準</div>
+        <div class="help-content">
+            1. <b>角差</b>：絕對值應 ≦ <code>60"</code>。<br>
+            2. <b>距差</b>：依選定等級 <code>(理論距離 / 等級)</code> 判定。<br>
+            3. <b>合格但書</b>：若角距超限，但 <b>位移誤差 ≦ 2.0cm</b> 仍判定為合格。
+        </div>
+    </div>
+
+    <div class="help-section">
+        <div class="help-title">三、 功能詳細說明</div>
+        <div class="help-content">
+            ● <b>案名與標準儲存</b>：列印報表時將資訊標註於頁首中央與右側。<br>
+            ● <b>度分秒自動轉換</b>：角度輸入採「度.分秒」格式。<br>
+            ● <b>座標還原檢核</b>：利用幾何原理反算實測座標比對位移差。
+        </div>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;" onclick="closeModal()">關閉手冊</button>
+</div>
+
+<div id="print-area">
+    <div class="print-header">
+        <p class="print-title">都市計畫樁位精度檢核系統報表</p>
+        <p id="printProjectDisplay" class="print-project">案名：(未輸入)</p>
+        <span id="printPrecisionDisplay" class="print-precision-tag">距離檢核標準：1/2000</span>
+    </div>
+    <table class="print-table">
+        <thead>
+            <tr>
+                <th class="col-1">站/後/前</th><th class="col-2">量測角度</th><th class="col-3">理論角度</th><th class="col-4">角差(")</th>
+                <th class="col-5">量測距離</th><th class="col-6">理論距離</th><th class="col-7">距差(cm)</th><th class="col-8">位移誤差(cm)</th>
+                <th class="col-9">結果</th><th class="col-10">備註</th>
+            </tr>
+        </thead>
+        <tbody id="print-tbody"></tbody>
+    </table>
+</div>
+
+<script>
+    let basePoints = {}; 
+    let records = [];
+
+    function updatePrintInfo() {
+        const name = document.getElementById('projectName').value;
+        const levelVal = document.getElementById('precisionLevel').value;
+        localStorage.setItem('survey_pname', name);
+        localStorage.setItem('survey_level', levelVal);
+        document.getElementById('printProjectDisplay').innerText = "案名：" + (name || "(未輸入)");
+        document.getElementById('printPrecisionDisplay').innerText = "距離檢核標準：1/" + levelVal;
+    }
+
+    function openModal() { document.getElementById('helpModal').style.display = 'block'; document.getElementById('modalOverlay').style.display = 'block'; }
+    function closeModal() { document.getElementById('helpModal').style.display = 'none'; document.getElementById('modalOverlay').style.display = 'none'; }
+
+    function checkAngle(input) {
+        const val = parseFloat(input.value);
+        const btn = document.getElementById('calcBtn');
+        if (val < 0 || val > 360) { input.style.border = "3px solid red"; btn.disabled = true; }
+        else { input.style.border = "1px solid #ddd"; btn.disabled = false; }
+    }
+
+    window.onload = function() {
+        const p = localStorage.getItem('survey_pts'), r = localStorage.getItem('survey_recs'), n = localStorage.getItem('survey_pname'), l = localStorage.getItem('survey_level');
+        if (p) basePoints = JSON.parse(p);
+        if (r) { records = JSON.parse(r); render(); }
+        if (n) document.getElementById('projectName').value = n;
+        if (l) document.getElementById('precisionLevel').value = l;
+        updatePrintInfo();
+    };
+
+    function readCSV() {
+        const file = document.getElementById('csvFile').files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const lines = e.target.result.split(/\r?\n/);
+            basePoints = {};
+            lines.forEach(l => {
+                const c = l.split(',');
+                if (c.length >= 3) basePoints[c[0].trim()] = { e: parseFloat(c[1]), n: parseFloat(c[2]) };
+            });
+            localStorage.setItem('survey_pts', JSON.stringify(basePoints));
+            alert("座標載入成功");
+        };
+        reader.readAsText(file);
+    }
+
+    function calculate() {
+        const st = document.getElementById('pt0').value, bs = document.getElementById('ptb').value, fs = document.getElementById('ptf').value;
+        const d_obs = parseFloat(document.getElementById('dist').value) || 0, a_raw = parseFloat(document.getElementById('angle').value);
+        const level = parseInt(document.getElementById('precisionLevel').value);
+
+        if (!basePoints[st] || !basePoints[bs] || !basePoints[fs]) return alert("點號不存在");
+
+        const p0 = basePoints[st], pb = basePoints[bs], pf = basePoints[fs];
+        const azB = Math.atan2(pb.e - p0.e, pb.n - p0.n);
+        const d_the = Math.sqrt((pf.e - p0.e)**2 + (pf.n - p0.n)**2);
+        const d_limit_m = d_the / level;
+
+        let a_the = (Math.atan2(pf.e - p0.e, pf.n - p0.n) - azB) * 180 / Math.PI;
+        if (a_the < 0) a_the += 360;
+
+        const deg = Math.floor(a_raw + 0.0000001), min = Math.floor((a_raw - deg) * 100 + 0.0001), sec = ((a_raw - deg) * 100 - min) * 100;
+        const a_obs_dec = deg + min/60.0 + sec/3600.0;
+
+        let a_err = Math.abs((a_obs_dec - a_the) * 3600);
+        if (a_err > 648000) a_err = 1296000 - a_err;
+
+        const d_err_m = Math.abs(d_obs - d_the);
+        const posErr_m = Math.sqrt((p0.e + d_obs * Math.sin(azB + (a_obs_dec * Math.PI / 180)) - pf.e)**2 + (p0.n + d_obs * Math.cos(azB + (a_obs_dec * Math.PI / 180)) - pf.n)**2);
+        const p_cm = (posErr_m * 100).toFixed(1);
+        
+        // 核心判斷：角距合格 OR 位移差合格
+        const isPass = (a_err <= 60 && d_err_m <= d_limit_m) || posErr_m <= 0.02;
+
+        records.unshift({
+            pt: `${st}/${bs}/${fs}`, a_obs: a_raw.toFixed(4) + "°", a_the: a_the.toFixed(4) + "°", a_err: a_err.toFixed(1),
+            d_obs: d_obs.toFixed(3) + "m", d_the: d_the.toFixed(3) + "m", d_err: (d_err_m * 100).toFixed(1),
+            pos: p_cm, res: isPass ? "合格" : "不合格",
+            a_cls: a_err > 60 ? 'text-danger' : '', d_cls: d_err_m > d_limit_m ? 'text-danger' : '',
+            note: (isPass && (a_err > 60 || d_err_m > d_limit_m)) ? "位移差≤2cm判定合格" : ""
+        });
+
+        localStorage.setItem('survey_recs', JSON.stringify(records));
+        render();
+    }
+
+    function render() {
+        const tbody = document.getElementById('web-tbody'), printT = document.getElementById('print-tbody');
+        if (records.length === 0) return;
+        tbody.innerHTML = records.map((r, i) => `<tr><td><b>${r.pt}</b></td><td>${r.a_obs}<br>${r.a_the}<br><span class="${r.a_cls}">${r.a_err}"</span></td><td>${r.d_obs}<br>${r.d_the}<br><span class="${r.d_cls}">${r.d_err}cm</span></td><td><b style="color:${r.res==='合格'?'green':'red'}">${r.res}</b><br><small>${r.note}</small></td><td class="no-print"><button class="btn btn-danger" onclick="del(${i})">X</button></td></tr>`).join('');
+        printT.innerHTML = records.map(r => `<tr><td>${r.pt}</td><td>${r.a_obs}</td><td>${r.a_the}</td><td class="${r.a_cls}">${r.a_err}</td><td>${r.d_obs}</td><td>${r.d_the}</td><td class="${r.d_cls}">${r.d_err}</td><td>${r.pos}</td><td>${r.res}</td><td>${r.note}</td></tr>`).join('');
+    }
+
+    function del(i) { if (confirm("確定刪除？")) { records.splice(i, 1); localStorage.setItem('survey_recs', JSON.stringify(records)); render(); } }
+    function clearAll() { if (confirm("確定清空？")) { localStorage.clear(); location.reload(); } }
+</script>
+
+</body>
+</html>
